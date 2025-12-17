@@ -1,0 +1,22 @@
+# Core dependencies for FFT Audio Visualizer
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Audio processing
+pyaudio>=0.2.11
+sounddevice>=0.4.4
+
+# Adafruit RGB Matrix library for LED display
+rgbmatrix>=0.0.1
+
+# GPIO and hardware interfaces
+RPi.GPIO>=0.7.1
+adafruit-circuitpython-busdevice>=5.0.0
+adafruit-circuitpython-charlcd>=3.3.0
+
+# Menu and display
+pillow>=9.0.0
+luma.oled>=3.8.0
+
+# Configuration
+pyyaml>=6.0

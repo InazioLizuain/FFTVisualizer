@@ -1,0 +1,25 @@
+[Unit]
+Description=FFT Audio Visualizer for Raspberry Pi
+Documentation=https://github.com/InazioLizuain/FFTVisualizer
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/FFTVisualizer
+ExecStart=/usr/bin/python3 /home/pi/FFTVisualizer/fft_visualizer.py
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/var/log/fft_visualizer.log
+StandardError=append:/var/log/fft_visualizer.log
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+CPUQuota=80%
+MemoryLimit=512M
+
+[Install]
+WantedBy=multi-user.target

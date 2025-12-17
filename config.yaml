@@ -1,0 +1,118 @@
+# FFT Audio Visualizer Configuration
+
+# Audio Input Settings
+audio:
+  # Sample rate in Hz (higher rate for better frequency resolution)
+  sample_rate: 44100
+  
+  # Number of samples per FFT window
+  fft_size: 2048
+  
+  # Input buffer size
+  buffer_size: 4096
+  
+  # Audio input modes: 'low_level' or 'high_power'
+  default_mode: 'low_level'
+  
+  # Low level input settings (10mV-1V from generator)
+  low_level:
+    # ADC channel for low level input
+    adc_channel: 0
+    # Input gain/amplification factor
+    gain: 10.0
+    # Input voltage range (V)
+    voltage_range: [0.01, 1.0]
+  
+  # High power input settings (40W audio output)
+  high_power:
+    # Audio input device index (use 'default' or device number)
+    device: 'default'
+    # Attenuation factor for high power signals
+    attenuation: 0.1
+    # Input voltage range (V)
+    voltage_range: [0, 10.0]
+
+# LED Matrix Display Settings
+display:
+  # Matrix size
+  rows: 64
+  cols: 64
+  
+  # LED chain length (number of panels)
+  chain_length: 1
+  
+  # Parallel chains
+  parallel: 1
+  
+  # Hardware mapping (see rgbmatrix documentation)
+  hardware_mapping: 'adafruit-hat'
+  
+  # PWM bits (1-11, higher = more colors but slower)
+  pwm_bits: 11
+  
+  # Brightness (0-100)
+  brightness: 75
+  
+  # GPIO slowdown (0-4, may need adjustment for stability)
+  gpio_slowdown: 2
+
+# FFT Visualization Settings
+visualization:
+  # Frequency range to display (Hz)
+  freq_min: 20
+  freq_max: 20000
+  
+  # Number of frequency bins to display (max 64 for 64-wide matrix)
+  num_bins: 64
+  
+  # Frequency scaling: 'linear' or 'logarithmic'
+  freq_scale: 'logarithmic'
+  
+  # Amplitude smoothing factor (0-1, higher = more smoothing)
+  smoothing: 0.7
+  
+  # Color scheme: 'rainbow', 'fire', 'ocean', 'matrix'
+  color_scheme: 'rainbow'
+  
+  # Peak hold time in frames
+  peak_hold: 15
+  
+  # Peak decay rate
+  peak_decay: 0.05
+
+# LCD Menu Display Settings
+menu:
+  # LCD type: 'character' (16x2/20x4) or 'oled' (128x64)
+  display_type: 'character'
+  
+  # For character LCD
+  lcd_rs: 25
+  lcd_en: 24
+  lcd_d4: 23
+  lcd_d5: 17
+  lcd_d6: 18
+  lcd_d7: 22
+  lcd_columns: 20
+  lcd_rows: 4
+  
+  # For OLED display
+  oled_width: 128
+  oled_height: 64
+  oled_i2c_address: 0x3C
+  
+  # Menu navigation GPIO pins
+  button_up: 5
+  button_down: 6
+  button_select: 13
+  button_back: 19
+
+# System Settings
+system:
+  # Enable debug output
+  debug: false
+  
+  # Log file path
+  log_file: '/var/log/fft_visualizer.log'
+  
+  # Auto-start on boot
+  autostart: true
