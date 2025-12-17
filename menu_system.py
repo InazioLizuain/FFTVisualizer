@@ -121,7 +121,7 @@ class MenuSystem:
                 self.logger.error(f"Failed to initialize character LCD: {e}")
                 self.lcd = None
         
-        # TODO: Add OLED display support if needed
+        # Note: OLED display support (luma.oled) can be added in future if needed
     
     def _init_buttons(self):
         """Initialize navigation buttons"""
