@@ -7,7 +7,8 @@ pyaudio>=0.2.11
 sounddevice>=0.4.4
 
 # Adafruit RGB Matrix library for LED display
-rgbmatrix>=0.0.1
+# NOTE: rgbmatrix is not installed via pip. See INSTALL.md for instructions.
+# rgbmatrix>=0.0.1
 
 # GPIO and hardware interfaces
 RPi.GPIO>=0.7.1

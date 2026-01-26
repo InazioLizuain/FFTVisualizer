@@ -47,6 +47,11 @@ sudo apt-get install -y build-essential autoconf libtool pkg-config
 
 ## Step 2: Install RGB Matrix Library
 
+
+The rpi-rgb-led-matrix library (which provides the `rgbmatrix` Python module) is **not installed via pip**. You must compile and install it from source as shown below. If you see errors about `rgbmatrix` when installing Python dependencies, ignore them, as this step handles its installation.
+
+**Tip:** You can comment out or remove the `rgbmatrix` line in `requirements.txt` to avoid pip errors.
+
 The rpi-rgb-led-matrix library needs to be compiled from source:
 
 ```bash
@@ -90,6 +95,7 @@ source venv/bin/activate
 ### Install Dependencies
 ```bash
 pip3 install --upgrade pip
+# If you see an error about 'rgbmatrix', ignore it (see note above)
 pip3 install -r requirements.txt
 ```
 
