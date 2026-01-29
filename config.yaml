@@ -14,14 +14,26 @@ audio:
   # Audio input modes: 'low_level' or 'high_power'
   default_mode: 'low_level'
   
-  # Low level input settings (10mV-1V from generator)
+  # Low level input settings (Digital I2S microphone, e.g., SPH0645)
   low_level:
-    # ADC channel for low level input
-    adc_channel: 0
-    # Input gain/amplification factor
-    gain: 10.0
-    # Input voltage range (V)
-    voltage_range: [0.01, 1.0]
+    # PortAudio/ALSA input device (sounddevice):
+    # - 'default' to use the default input device
+    # - numeric index (as string or int)
+    # - device name/substring (advanced)
+    device: 'default'
+
+    # Recommended for SPH0645: 48000 Hz. If omitted, falls back to audio.sample_rate.
+    sample_rate: 48000
+
+    # Many I2S mic drivers expose 2 channels even for a single mic.
+    # Set channels=2 and choose channel_index 0/1 if needed.
+    channels: 2
+    channel_index: 0
+
+    # Optional preprocessing
+    remove_dc: true
+    gain: 1.0
+    dtype: 'float32'
   
   # High power input settings (40W audio output)
   high_power:
@@ -82,8 +94,11 @@ visualization:
 
 # LCD Menu Display Settings
 menu:
-  # LCD type: 'character' (16x2/20x4) or 'oled' (128x64)
-  display_type: 'character'
+  # Menu display type: 'character' (16x2/20x4) or 'oled' (128x64)
+  display_type: 'oled'
+
+  # Menu input type: 'buttons' (GPIO) or 'i2c_encoder'
+  input_type: 'i2c_encoder'
   
   # For character LCD
   lcd_rs: 25
@@ -99,12 +114,22 @@ menu:
   oled_width: 128
   oled_height: 64
   oled_i2c_address: 0x3C
+
+  # I2C rotary encoder (Adafruit Seesaw-based encoder board)
+  # Common address for Adafruit I2C rotary encoder boards can be 0x49.
+  encoder_i2c_address: 0x49
+  # These Seesaw pin numbers vary by board/firmware; adjust if needed.
+  encoder_a_pin: 18
+  encoder_b_pin: 19
+  encoder_switch_pin: 24
+  encoder_direction: 1
+  encoder_long_press_ms: 800
   
-  # Menu navigation GPIO pins
+  # Legacy menu navigation GPIO pins (only used if input_type: 'buttons')
   button_up: 5
   button_down: 6
   button_select: 13
-  button_back: 19
+  button_back: 26
 
 # System Settings
 system:

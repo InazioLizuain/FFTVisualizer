@@ -9,7 +9,7 @@ A professional DIY project for real-time audio frequency spectrum visualization 
 ## Features
 
 ✨ **Dual Input Modes**
-- **Low-Level Mode**: 10mV-1V signals from signal generators and lab equipment (via ADS1115 16-bit ADC)
+- **Low-Level Mode**: Ambient/near-field audio capture via digital I2S microphone (SPH0645)
 - **High-Power Mode**: 40W audio amplifier outputs for music visualization (via USB audio interface)
 
 📊 **Real-Time FFT Processing**
@@ -26,7 +26,8 @@ A professional DIY project for real-time audio frequency spectrum visualization 
 
 🖥️ **Interactive Menu System**
 - 20x4 character LCD or 128x64 OLED display
-- Four-button navigation (UP, DOWN, SELECT, BACK)
+- I2C OLED menu display (128x64)
+- Rotary encoder navigation (rotate + press)
 - Real-time settings adjustment
 - System status display
 
@@ -45,9 +46,8 @@ A professional DIY project for real-time audio frequency spectrum visualization 
 - 5V 4A Power Supply
 
 ### Audio Input (Low-Level)
-- ADS1115 16-bit ADC (4-channel, I2C)
-- Input protection circuit components
-- BNC or 3.5mm jack connector
+- Digital MEMS I2S microphone (SPH0645)
+- I2S/PCM wiring to Raspberry Pi GPIO (BCLK/LRCLK/DOUT)
 
 ### Audio Input (High-Power)
 - USB Audio Interface (e.g., Behringer UCA202)
@@ -55,12 +55,10 @@ A professional DIY project for real-time audio frequency spectrum visualization 
 - High-wattage resistors and heatsinking
 
 ### Menu Display
-- 20x4 Character LCD (HD44780) with I2C backpack, or
-- 128x64 OLED Display (SSD1306)
+- 0.96" OLED Display (128x64, I2C) (SSD1306-compatible)
 
 ### Navigation
-- 4x Tactile push buttons
-- 4x 10kΩ resistors (or use internal pull-ups)
+- I2C Rotary Encoder board (Adafruit Seesaw-based, address 0x49)
 
 ### Miscellaneous
 - MicroSD Card (16GB+, Class 10)
@@ -76,7 +74,7 @@ A professional DIY project for real-time audio frequency spectrum visualization 
 ```bash
 # System packages
 sudo apt-get update
-sudo apt-get install -y python3-pip git i2c-tools python3-pyaudio portaudio19-dev
+sudo apt-get install -y python3-pip git i2c-tools portaudio19-dev
 
 # RGB Matrix library
 cd ~
@@ -129,10 +127,10 @@ sudo python3 fft_visualizer.py
 ```
 FFTVisualizer/
 ├── fft_visualizer.py      # Main application entry point
-├── audio_input.py         # Dual-mode audio input handler (ADC + USB Audio)
+├── audio_input.py         # Dual-mode audio input handler (I2S mic + USB Audio)
 ├── fft_processor.py       # FFT processing and frequency analysis
 ├── led_display.py         # RGB LED matrix display driver
-├── menu_system.py         # LCD menu and button navigation
+├── menu_system.py         # OLED/LCD menu and input navigation
 ├── config.yaml            # Configuration file
 ├── requirements.txt       # Python dependencies
 ├── README.md              # This file
@@ -175,8 +173,8 @@ sudo python3 fft_visualizer.py
 
 ### Signal Generator Testing
 ```bash
-# Set to low-level mode for lab equipment
-# Connect signal generator to ADC input
+# Set to low-level mode for I2S microphone
+# Ensure the I2S mic appears in `arecord -l` and config.yaml is set correctly
 sudo python3 fft_visualizer.py
 # Use menu to select: Input Mode → Low Level
 ```
@@ -198,10 +196,10 @@ sudo systemctl start fft-visualizer.service
 - Ensure HAT is properly seated
 
 ### No Audio Input
-- Verify I2C devices: `i2cdetect -y 1`
-- Check USB audio: `arecord -l`
-- Test audio circuit with multimeter
-- Verify configuration settings
+- Verify I2C devices: `i2cdetect -y 1` (OLED/encoder/RTC)
+- Check capture devices: `arecord -l`
+- For low-level (I2S mic): verify I2S/PCM is enabled and the correct overlay is loaded
+- Verify `audio.low_level.device`, `channels`, and `channel_index` in config.yaml
 
 ### Display Flickering
 - Increase `gpio_slowdown` (1-4)

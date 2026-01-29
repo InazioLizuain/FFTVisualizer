@@ -17,9 +17,11 @@
            │                         │                         │
            ▼                         ▼                         ▼
 ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-│  Audio Data Queue    │  │   LED Display        │  │  LCD + Buttons       │
-│   (Threading)        │  │  (led_display.py)    │  │   (GPIO)             │
+│  Audio Data Queue    │  │   LED Display        │  │  OLED + Encoder      │
+│   (Threading)        │  │  (led_display.py)    │  │      (I2C)           │
 └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
+
+
 ```
 
 ## Component Details
@@ -57,21 +59,21 @@ Config File → Load Config → Initialize Components → Start Threads → Main
 │         Audio Input Manager                 │
 ├─────────────────────────────────────────────┤
 │  Mode Selection:                            │
-│  • Low-Level Mode  (ADC)                    │
+│  • Low-Level Mode  (I2S Mic)                │
 │  • High-Power Mode (USB Audio)              │
 └────────────┬────────────────────────────────┘
              │
              ├── Low-Level Input Path ──────────┐
              │   ┌────────────────────────┐     │
-             │   │  ADS1115 ADC (I2C)     │     │
-             │   │  • 16-bit resolution   │     │
-             │   │  • Programmable gain   │     │
-             │   │  • 10mV-1V range       │     │
+             │   │  I2S Mic (SPH0645)     │     │
+             │   │  • 48kHz typical       │     │
+             │   │  • PCM/I2S interface   │     │
+             │   │  • Channel select      │     │
              │   └────────────────────────┘     │
              │            ↓                      │
              │   ┌────────────────────────┐     │
-             │   │  Sample & Convert      │     │
-             │   │  to Audio Buffer       │     │
+             │   │  Audio Callback        │     │
+             │   │  Buffer Management     │     │
              │   └────────────────────────┘     │
              │                                   ↓
              └── High-Power Input Path ────────┐│
@@ -237,8 +239,8 @@ FFT Data {spectrum, peaks, colors}
 │            Menu System                     │
 ├───────────────────────────────────────────┤
 │  Hardware:                                │
-│  • 20x4 LCD Display (HD44780)             │
-│  • 4 GPIO Buttons (UP/DOWN/SELECT/BACK)   │
+│  • 128x64 OLED Display (I2C)              │
+│  • I2C Rotary Encoder (rotate + press)    │
 ├───────────────────────────────────────────┤
 │  Menu Structure:                          │
 │  Main Menu                                │
@@ -262,32 +264,31 @@ FFT Data {spectrum, peaks, colors}
 └───────────────────────────────────────────┘
 ```
 
-**Button Handling:**
+**Encoder Handling:**
 ```
-GPIO Pins (with pull-up resistors)
+I2C Encoder (Seesaw)
     ↓
-Button Press (FALLING edge)
+Poll rotation + switch state
     ↓
-Interrupt Handler (debounced)
+Debounce / long-press detection
     ↓
 ┌─────────────────────────────────┐
-│  Button Action:                 │
-│  • UP    → Previous menu item   │
-│  • DOWN  → Next menu item       │
-│  • SELECT→ Execute action       │
-│  • BACK  → Return to main menu  │
+│  Encoder Action:                │
+│  • Rotate → Prev/Next item      │
+│  • Press  → Execute action      │
+│  • Long   → Back                │
 └─────────────────────────────────┘
     ↓
-Update LCD Display
+Update OLED Display
 ```
 
 **Threading Model:**
 ```
 Main Thread ─────► Menu Update Loop (10Hz)
                    ↓
-                   LCD Display Updates
-                   
-GPIO Interrupts ─► Button Event Handlers
+                   OLED Display Updates
+
+Menu Thread ─────► I2C Encoder Polling
                    ↓
                    Update Menu State
 ```
@@ -305,7 +306,7 @@ GPIO Interrupts ─► Button Event Handlers
 ┌──────────────────────────────────────┐
 │        Audio Input Module            │
 │  ┌────────────┐  ┌────────────┐     │
-│  │ ADC Input  │  │ USB Audio  │     │
+│  │ I2S Mic    │  │ USB Audio  │     │
 │  │ (Low-Level)│  │(High-Power)│     │
 │  └────────────┘  └────────────┘     │
 └──────────┬───────────────────────────┘
@@ -332,7 +333,7 @@ GPIO Interrupts ─► Button Event Handlers
 
          ┌──────────────────────┐
          │   Menu System        │◄─── User Input
-         │  (LCD + Buttons)     │     (GPIO)
+         │ (OLED/LCD + Encoder) │     (I2C)
          └──────────┬───────────┘
                     │
                     │ Configuration Changes
@@ -362,24 +363,22 @@ GPIO Interrupts ─► Button Event Handlers
 ┌────────────────────────────────────────────────────────────┐
 │              Audio Input Thread (Daemon)                    │
 │  • Continuous audio capture                                │
-│  • Mode-specific input (ADC or USB)                        │
+│  • Mode-specific input (I2S mic or USB)                    │
 │  • Buffer to queue                                         │
 │  • Non-blocking queue put                                  │
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
 │              Menu System Thread (Daemon)                    │
-│  • LCD display updates (10Hz)                              │
+│  • OLED display updates (10Hz)                             │
 │  • Menu rendering                                          │
 │  • Status display                                          │
 └────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────┐
-│              GPIO Interrupt Handlers                        │
-│  • Button press detection                                  │
-│  • Debouncing (200ms)                                     │
-│  • Menu navigation updates                                 │
-│  • Non-blocking execution                                  │
+│              Menu Input Polling                             │
+│  • I2C rotary encoder rotation/press                         │
+│  • Debouncing / long-press handling                          │
 └────────────────────────────────────────────────────────────┘
 
 Synchronization:
@@ -395,13 +394,12 @@ Synchronization:
 ```
 Raspberry Pi 4 GPIO Connections:
 ┌─────────────────────────────────────────┐
-│  GPIO 2  (SDA)  → I2C Data             │ ← ADC & LCD (I2C)
+│  GPIO 2  (SDA)  → I2C Data             │ ← OLED + Encoder + RTC
 │  GPIO 3  (SCL)  → I2C Clock            │
 │                                         │
-│  GPIO 5         → Button UP            │
-│  GPIO 6         → Button DOWN          │
-│  GPIO 13        → Button SELECT        │
-│  GPIO 19        → Button BACK          │
+│  GPIO 18        → PCM/I2S BCLK          │ ← I2S Mic
+│  GPIO 19        → PCM/I2S LRCLK (FS)    │
+│  GPIO 20        → PCM/I2S DIN           │
 │                                         │
 │  GPIO 17-27     → RGB Matrix HAT       │ ← LED Matrix
 │  (Multiple)       (via HAT)            │
@@ -410,11 +408,12 @@ Raspberry Pi 4 GPIO Connections:
 Power:
 • 5V 4A → RGB Matrix HAT → LED Matrix
 • 5V    → Raspberry Pi (from HAT or separate)
-• 3.3V  → ADC, LCD (from Pi)
+• 3.3V  → OLED, Encoder (from Pi)
 
-I2C Bus (0x70):
-• ADS1115 ADC    (Address: 0x48)
-• LCD I2C Pack   (Address: 0x27 or 0x3F)
+I2C Bus:
+• OLED Display   (Address: 0x3C or 0x3D)
+• I2C Encoder    (Address: 0x49)
+• RTC on HAT     (Address: 0x68)
 
 USB:
 • USB Audio Interface (enumerated device)

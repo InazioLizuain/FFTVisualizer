@@ -31,7 +31,7 @@ sudo raspi-config
 sudo apt-get install -y git python3-pip python3-dev python3-setuptools
 
 # Audio libraries
-sudo apt-get install -y portaudio19-dev python3-pyaudio libasound2-dev
+sudo apt-get install -y portaudio19-dev libasound2-dev
 
 # I2C and GPIO tools
 sudo apt-get install -y i2c-tools python3-smbus
@@ -46,6 +46,11 @@ sudo apt-get install -y build-essential autoconf libtool pkg-config
 ---
 
 ## Step 2: Install RGB Matrix Library
+
+
+The rpi-rgb-led-matrix library (which provides the `rgbmatrix` Python module) is **not installed via pip**. You must compile and install it from source as shown below. If you see errors about `rgbmatrix` when installing Python dependencies, ignore them, as this step handles its installation.
+
+**Tip:** You can comment out or remove the `rgbmatrix` line in `requirements.txt` to avoid pip errors.
 
 The rpi-rgb-led-matrix library needs to be compiled from source:
 
@@ -90,15 +95,21 @@ source venv/bin/activate
 ### Install Dependencies
 ```bash
 pip3 install --upgrade pip
+# If you see an error about 'rgbmatrix', ignore it (see note above)
 pip3 install -r requirements.txt
 ```
 
 ### Install Additional Hardware Libraries
 
-#### For ADC (ADS1115)
-```bash
-pip3 install adafruit-circuitpython-ads1x15
-```
+#### For I2S Microphone (SPH0645)
+
+The I2S microphone is exposed to Python as a standard ALSA/PortAudio **capture device**.
+
+1) Enable I2S/PCM in Raspberry Pi OS (`raspi-config`) and reboot.
+
+2) Install/enable the correct device-tree overlay for your SPH0645 breakout.
+
+Because overlays vary across Raspberry Pi OS/kernel versions and breakout variants, follow the overlay instructions that match your setup. The key requirement is that after reboot, the mic appears in `arecord -l`.
 
 #### For Character LCD
 ```bash
@@ -107,7 +118,12 @@ pip3 install RPLCD
 
 #### For OLED Display (if using OLED instead of LCD)
 ```bash
-pip3 install luma.oled
+pip3 install adafruit-circuitpython-ssd1306 pillow
+```
+
+#### For I2C Rotary Encoder (Seesaw-based, address 0x49)
+```bash
+pip3 install adafruit-circuitpython-seesaw
 ```
 
 ---
@@ -122,7 +138,7 @@ nano config.yaml
 Key settings to adjust:
 - **Audio input mode:** Set default_mode to 'low_level' or 'high_power'
 - **Display settings:** Adjust brightness, hardware_mapping
-- **GPIO pins:** Verify button and LCD pin assignments match your wiring
+- **Menu UI:** Verify OLED I2C address and encoder settings match your wiring
 - **Frequency range:** Default is 20-20000 Hz
 
 ### Test Configuration
@@ -137,7 +153,8 @@ python3 -c "import yaml; yaml.safe_load(open('config.yaml'))"
 
 ### Test I2C Devices
 ```bash
-# Should show addresses of ADS1115 (0x48) and LCD (if I2C)
+# Should show addresses of OLED (commonly 0x3C),
+# encoder board (0x49), and the RTC on the RGB Matrix HAT (0x68)
 i2cdetect -y 1
 ```
 
@@ -146,8 +163,16 @@ i2cdetect -y 1
 # List audio devices
 arecord -l
 
+# Test recording (for low-level mode: I2S mic)
+# Use the card/device shown by `arecord -l`.
+# Many I2S mic drivers use 48kHz, 2 channels, and 32-bit samples.
+arecord -D plughw:2,0 -d 3 -r 48000 -c 2 -f S32_LE test_i2s.wav
+aplay test_i2s.wav
+
 # Test recording (for high-power mode)
-arecord -D plughw:1,0 -d 3 -f cd test.wav
+# Use the card/device shown by `arecord -l`.
+# Example: if you see "card 2" and "device 0", use plughw:2,0
+arecord -D plughw:2,0 -d 3 -f cd test.wav
 aplay test.wav
 ```
 
@@ -323,7 +348,8 @@ arecord -l
 lsusb  # For USB audio
 
 # Test audio input
-arecord -D plughw:1,0 -d 5 -f cd -t wav test.wav
+## Use the card/device shown by `arecord -l` (example: plughw:2,0)
+arecord -D plughw:2,0 -d 5 -f cd -t wav test.wav
 ```
 
 ### I2C Issues
