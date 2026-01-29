@@ -7,9 +7,9 @@ This project implements a complete, production-ready FFT audio spectrum visualiz
 ## Key Features
 
 ### 1. Dual Audio Input System
-- **Low-Level Mode**: 10mV-1V signals via 16-bit ADC (ADS1115)
-  - Ideal for: Signal generators, lab equipment, precision audio testing
-  - Features: High resolution, programmable gain, low noise floor
+- **Low-Level Mode**: Digital I2S microphone input (SPH0645)
+   - Ideal for: Ambient/music pickup near the system
+   - Features: Standard audio sampling (typically 48kHz), no analog biasing/ADC required
   
 - **High-Power Mode**: 40W audio output via USB audio interface
   - Ideal for: Music visualization, DJ setups, live performances
@@ -36,7 +36,8 @@ This project implements a complete, production-ready FFT audio spectrum visualiz
 
 ### 4. Interactive Menu System
 - 20x4 character LCD display (or 128x64 OLED option)
-- Four-button navigation (UP, DOWN, SELECT, BACK)
+- OLED display support (128x64 I2C)
+- Rotary encoder navigation (I2C, rotate + press)
 - Real-time settings adjustment:
   - Input mode selection
   - Brightness control (25%, 50%, 75%, 100%)
@@ -58,10 +59,10 @@ This project implements a complete, production-ready FFT audio spectrum visualiz
 - **Processor**: Raspberry Pi 4 Model B (2GB+ RAM)
 - **Display**: 64x64 RGB LED Matrix (3mm pitch)
 - **LED Driver**: Adafruit RGB Matrix HAT + RTC
-- **Audio Input (Low-Level)**: ADS1115 16-bit ADC
+- **Audio Input (Low-Level)**: SPH0645 Digital I2S Microphone
 - **Audio Input (High-Power)**: USB Audio Interface
 - **Menu Display**: 20x4 Character LCD or 128x64 OLED
-- **Navigation**: 4x tactile push buttons
+- **Navigation**: I2C rotary encoder (Seesaw-based)
 - **Power**: 5V 4A supply for LED matrix
 
 ### Software Components
@@ -76,7 +77,7 @@ This project implements a complete, production-ready FFT audio spectrum visualiz
 - Dual-mode audio capture
 - Thread-based input processing
 - Queue-based data delivery
-- ADC integration (I2C)
+- I2S microphone capture (PortAudio/ALSA via sounddevice)
 - USB audio interface support
 - Mode switching without restart
 
@@ -98,7 +99,7 @@ This project implements a complete, production-ready FFT audio spectrum visualiz
 
 #### Menu System (`menu_system.py`)
 - LCD/OLED display management
-- GPIO button handling with debouncing
+- I2C rotary encoder handling (rotate + press)
 - Hierarchical menu structure
 - Non-blocking operation (threaded)
 - System status display

@@ -42,6 +42,9 @@ class FFTVisualizer:
         except Exception as e:
             self.logger.error(f"Failed to initialize components: {e}")
             raise
+
+        # Sync FFT configuration to the selected default input mode
+        self.change_input_mode(self.config['audio'].get('default_mode', 'low_level'))
         
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -144,6 +147,25 @@ class FFTVisualizer:
         self.logger.info(f"Changing input mode to: {mode}")
         self.audio_input.set_mode(mode)
         self.config['audio']['default_mode'] = mode
+
+        # Update FFT processor sample rate for correct frequency axis.
+        if mode == 'low_level':
+            low_cfg = self.config['audio'].get('low_level', {})
+            sr = int(low_cfg.get('sample_rate', self.config['audio']['sample_rate']))
+            self.fft_processor.set_sample_rate(sr)
+
+            # Clamp visualization range to Nyquist for low sample rates
+            nyquist = sr / 2.0
+            freq_min = float(self.config['visualization']['freq_min'])
+            freq_max = float(self.config['visualization']['freq_max'])
+            self.fft_processor.set_frequency_range(freq_min, min(freq_max, nyquist))
+        else:
+            sr = int(self.config['audio']['sample_rate'])
+            self.fft_processor.set_sample_rate(sr)
+            self.fft_processor.set_frequency_range(
+                float(self.config['visualization']['freq_min']),
+                float(self.config['visualization']['freq_max'])
+            )
     
     def set_brightness(self, brightness: int):
         """Set LED display brightness (0-100)"""

@@ -27,7 +27,7 @@ sudo systemctl status fft-visualizer.service
 
 ### Stopping the Visualizer
 - Press `Ctrl+C` if running manually
-- Use menu system BACK button to exit
+- Use the rotary encoder long-press to go back
 - Or use systemctl stop command
 
 ---
@@ -38,28 +38,24 @@ The FFT Visualizer supports two distinct audio input modes:
 
 ### 1. Low-Level Mode (10mV-1V)
 
-**Use Case:** Signal generators, low-level audio sources, lab equipment
+**Use Case:** Ambient/near-field audio capture with a digital I2S microphone (SPH0645)
 
 **Features:**
-- Uses ADS1115 ADC for high-resolution capture
-- Programmable gain for optimal signal range
-- Suitable for testing and calibration
-- Low noise floor
+- Full audio-bandwidth sampling (commonly 48kHz)
+- No analog biasing/ADC required
+- Stable frequency axis (sample rate is defined in config)
 
 **Connection:**
-- Connect signal to BNC/3.5mm input jack
-- Ensure signal is within 10mV-1V range
-- Ground reference required
+- Wire the SPH0645 to the Raspberry Pi I2S/PCM pins (see HARDWARE.md)
+- Enable I2S/PCM + correct overlay so the mic appears in `arecord -l`
 
 **To Activate:**
 - Use menu system: `Input Mode` → `Low Level`
 - Or edit config.yaml: `default_mode: 'low_level'`
 
-**Calibration:**
-1. Apply known frequency (e.g., 1kHz)
-2. Apply known amplitude (e.g., 100mV)
-3. Verify display shows correct frequency
-4. Adjust gain in config.yaml if needed
+**Tuning:**
+- If the device exposes 2 channels but only one has audio, set `audio.low_level.channels: 2` and flip `audio.low_level.channel_index` between 0 and 1.
+- Use `audio.low_level.gain` for simple level scaling.
 
 ### 2. High-Power Mode (40W Audio)
 
@@ -90,12 +86,12 @@ The FFT Visualizer supports two distinct audio input modes:
 
 ## Menu System Navigation
 
-### Button Functions
+### Rotary Encoder Functions (I2C)
 
-- **UP Button**: Navigate to previous menu item
-- **DOWN Button**: Navigate to next menu item
-- **SELECT Button**: Choose/activate current menu item
-- **BACK Button**: Return to previous menu or main menu
+- **Rotate clockwise**: Next menu item
+- **Rotate counter-clockwise**: Previous menu item
+- **Press (short)**: Select/activate current menu item
+- **Press (long)**: Back to main menu
 
 ### Menu Structure
 
@@ -335,7 +331,7 @@ This provides:
 ### No Visualization
 1. Check audio input is connected
 2. Verify input mode matches source
-3. Check audio levels: `arecord -l` or ADC readings
+3. Check audio levels: `arecord -l` and/or a short `arecord` test recording
 4. Increase `brightness` in config
 5. Check logs for errors
 

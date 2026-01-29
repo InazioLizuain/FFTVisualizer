@@ -60,6 +60,44 @@ class FFTProcessor:
             )
         
         self.logger.debug(f"Frequency bins: {self.freq_bins[:5]}...{self.freq_bins[-5:]}")
+
+    def set_sample_rate(self, sample_rate: int):
+        """Update sample rate (used to compute FFT frequency axis)."""
+        try:
+            sample_rate = int(sample_rate)
+        except Exception:
+            self.logger.warning(f"Invalid sample_rate: {sample_rate}")
+            return
+
+        if sample_rate <= 0:
+            self.logger.warning(f"Invalid sample_rate: {sample_rate}")
+            return
+
+        self.sample_rate = sample_rate
+
+        # Clamp freq_max to Nyquist if needed
+        nyquist = sample_rate / 2.0
+        if self.freq_max > nyquist:
+            self.freq_max = nyquist
+            self._calculate_frequency_bins()
+            self.logger.info(f"Clamped freq_max to Nyquist: {self.freq_max:.1f} Hz")
+
+    def set_frequency_range(self, freq_min: float, freq_max: float):
+        """Update visualization frequency range and recompute bin edges."""
+        try:
+            freq_min = float(freq_min)
+            freq_max = float(freq_max)
+        except Exception:
+            self.logger.warning("Invalid frequency range")
+            return
+
+        if freq_min <= 0 or freq_max <= 0 or freq_max <= freq_min:
+            self.logger.warning(f"Invalid frequency range: {freq_min}-{freq_max}")
+            return
+
+        self.freq_min = freq_min
+        self.freq_max = freq_max
+        self._calculate_frequency_bins()
     
     def process(self, audio_data: np.ndarray) -> dict:
         """

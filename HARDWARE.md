@@ -23,19 +23,12 @@
 
 ### Audio Input Hardware
 
-#### For Low-Level Signals (10mV-1V)
-5. **ADS1115 16-Bit ADC**
-   - 4-channel, 16-bit resolution
-   - I2C interface
-   - Programmable gain amplifier (PGA)
-   - Adafruit Product ID: 1085 or compatible
-
-6. **Input Protection Circuit Components:**
-   - 1x Voltage divider resistors (10kΩ and 1kΩ)
-   - 1x Capacitor 10µF (DC blocking)
-   - 1x Op-amp (optional): TL072 or similar for signal conditioning
-   - 2x Zener diodes 3.3V (input protection)
-   - BNC or 3.5mm jack connector
+#### For Low-Level Audio (Digital I2S Microphone)
+5. **Digital MEMS I2S Microphone (SPH0645)**
+   - I2S/PCM digital audio output (no analog biasing/ADC required)
+   - 3.3V power (do not use 5V)
+   - Typical use: ambient/music pickup near the system
+   - Note: many I2S mic drivers expose **2 channels** even for a single mic; the project supports selecting `channel_index` in config.
 
 #### For High-Power Audio (40W Output)
 7. **USB Audio Interface**
@@ -50,17 +43,16 @@
    - Speaker wire connectors
 
 ### Menu/Display Components
-9. **Character LCD 20x4 with I2C backpack** OR **128x64 OLED Display**
+9. **0.96" OLED Display (128x64, I2C)**
    - For menu system and settings display
-   - I2C interface preferred for easy connection
-   - Options:
-     - HD44780-compatible 20x4 LCD (recommended)
-     - SSD1306 128x64 OLED display
+   - Midas passive OLED, 128x64 pixels, yellow
+   - Typical I2C address: 0x3C (sometimes 0x3D)
+   - Note: some 0.96" I2C OLED modules use SH1106 instead of SSD1306; if your display does not respond with the SSD1306 driver, you may need an SH1106-compatible driver.
 
-10. **Navigation Buttons (4x)**
-    - Tactile push buttons
-    - 10kΩ pull-up resistors (or use internal pull-ups)
-    - Labels: UP, DOWN, SELECT, BACK
+10. **I2C Rotary Encoder + Breakout Board (Adafruit, Seesaw-based)**
+   - Used for menu navigation
+   - I2C address: 0x49
+   - Provides rotation + push button
 
 ### Miscellaneous
 11. **MicroSD Card** (16GB or larger, Class 10)
@@ -83,32 +75,27 @@
 
 ## Circuit Diagrams
 
-### Low-Level Audio Input Circuit (10mV-1V)
+### Low-Level Audio Input (I2S Microphone: SPH0645)
+
+The SPH0645 is a **digital I2S microphone**, so you wire it to the Raspberry Pi PCM/I2S pins. No analog protection/bias/ADC circuitry is required.
+
+Typical wiring (Raspberry Pi 40-pin header):
 
 ```
-Audio Signal Input (BNC/3.5mm jack)
-    |
-    +--- [10µF Cap] --- [10kΩ] ---+--- To ADS1115 A0
-    |                              |
-    |                          [1kΩ] (Voltage divider)
-    |                              |
-    +--- [3.3V Zener] -----------GND
-    |
-   GND
+SPH0645  -> Raspberry Pi
+3V3/VDD  -> 3.3V (Pin 1)
+GND      -> GND  (Pin 6)
+BCLK/SCK -> GPIO18 / PCM_CLK  (Pin 12)
+LRCLK/WS -> GPIO19 / PCM_FS   (Pin 35)
+DOUT/SD  -> GPIO20 / PCM_DIN  (Pin 38)
 
-ADS1115 Connections:
-- VDD  -> Raspberry Pi 3.3V
-- GND  -> Raspberry Pi GND
-- SCL  -> Raspberry Pi SCL (GPIO 3)
-- SDA  -> Raspberry Pi SDA (GPIO 2)
-- A0   -> Signal input (as shown above)
+# Some breakout boards also expose SEL/LR.
+# If present, it selects which stereo slot the mic transmits on.
 ```
 
 **Notes:**
-- The 10µF capacitor blocks DC component
-- Voltage divider scales signal to ADC range
-- Zener diodes protect ADC from overvoltage
-- ADS1115 has programmable gain for fine-tuning
+- Enable I2S/PCM on Raspberry Pi OS and install the correct device-tree overlay for your SPH0645 breakout.
+- Many I2S mic drivers expose **2 channels**; if you only see audio on one side, set `audio.low_level.channel_index` (0 or 1) and keep `channels: 2`.
 
 ### High-Power Audio Input Circuit (40W Output)
 
@@ -133,16 +120,33 @@ The attenuator reduces 40W (approx 20V RMS) to safe line level (~2V RMS)
 - Add heatsinking if needed
 - Consider using a transformer isolation for better safety
 
-### Button Connections
+### I2C Rotary Encoder Connections (Recommended)
+
+The I2C rotary encoder breakout shares the same I2C bus as the OLED and the RTC on the RGB Matrix HAT:
 
 ```
-Each button connects between GPIO pin and GND:
+Encoder Board -> Raspberry Pi
+VCC (3V/3.3V) -> 3.3V
+GND           -> GND
+SDA           -> GPIO 2 (SDA)
+SCL           -> GPIO 3 (SCL)
 
-Button UP     -> GPIO 5  -> GND (with internal pull-up)
-Button DOWN   -> GPIO 6  -> GND (with internal pull-up)
-Button SELECT -> GPIO 13 -> GND (with internal pull-up)
-Button BACK   -> GPIO 19 -> GND (with internal pull-up)
+I2C address: 0x49
 ```
+
+Verify on the Pi:
+```bash
+i2cdetect -y 1
+```
+
+You should typically see:
+- OLED: 0x3C (or 0x3D)
+- Encoder: 0x49
+- RTC on RGB Matrix HAT: 0x68
+
+### Buttons (Not used)
+
+This build uses an **I2C rotary encoder** for menu navigation; no additional button wiring is required.
 
 ### LCD Display Connections (20x4 Character LCD)
 
@@ -190,29 +194,29 @@ SCL -> GPIO 3 (SCL)
 3. Ensure polarity is correct (red = 5V, black = GND)
 
 ### Step 4: Build Audio Input Circuits
-1. Build low-level input circuit on breadboard or PCB
-2. Build high-power attenuator circuit (use proper insulation!)
-3. Test circuits with multimeter before connecting to Pi
+1. Connect the I2S microphone to the Raspberry Pi PCM/I2S pins
+2. Build the high-power attenuator circuit (use proper insulation!)
+3. Verify wiring before powering on
 
-### Step 5: Connect ADC (for low-level input)
-1. Connect ADS1115 to Raspberry Pi I2C pins
-2. Connect audio input circuit to ADS1115 channel A0
-3. Verify I2C connection: `i2cdetect -y 1`
+### Step 5: Connect I2S Microphone (for low-level input)
+1. Connect SPH0645 to GPIO18/19/20 + 3.3V + GND
+2. Enable I2S/PCM and configure the correct overlay (see INSTALL.md)
+3. Verify the capture device appears in `arecord -l`
 
 ### Step 6: Connect USB Audio (for high-power input)
 1. Connect USB audio interface to Raspberry Pi
 2. Connect attenuator circuit to audio interface line input
 3. Verify device: `arecord -l`
 
-### Step 7: Connect LCD Display
-1. Connect LCD according to pin diagram above
-2. Test display with simple Python script
-3. Adjust contrast potentiometer if using raw LCD
+### Step 7: Connect OLED Display
+1. Connect OLED via I2C: SDA (GPIO2) and SCL (GPIO3)
+2. Power the OLED from 3.3V and GND
+3. Verify it appears in `i2cdetect -y 1` (typically 0x3C)
 
-### Step 8: Connect Navigation Buttons
-1. Solder buttons to wires with appropriate length
-2. Connect to GPIO pins as specified
-3. Mount buttons in accessible locations on enclosure
+### Step 8: Connect I2C Rotary Encoder
+1. Connect encoder board via I2C: SDA (GPIO2) and SCL (GPIO3)
+2. Power the encoder from 3.3V and GND
+3. Verify it appears in `i2cdetect -y 1` (0x49)
 
 ### Step 9: Final Assembly
 1. Mount all components in enclosure
@@ -258,9 +262,8 @@ python3 -c "from led_display import LEDDisplay; import yaml; cfg = yaml.safe_loa
 ```
 
 ### 2. Audio Input Test (Low-Level)
-Use a signal generator to inject 100Hz, 100mV sine wave:
+Verify the I2S mic capture path is working:
 ```bash
-# Monitor ADC input
 python3 -c "from audio_input import AudioInput; import yaml; cfg = yaml.safe_load(open('config.yaml')); a = AudioInput(cfg['audio']); a.start(); import time; time.sleep(2); print(f'Level: {a.get_input_level()}')"
 ```
 
@@ -289,15 +292,15 @@ sudo python3 fft_visualizer.py
 - Ensure HAT is properly seated on GPIO pins
 
 ### No audio input
-- Verify I2C devices: `i2cdetect -y 1`
-- Check USB audio: `arecord -l`
-- Verify ADC connections and configuration
-- Test audio input circuit with multimeter
+- Verify I2C devices: `i2cdetect -y 1` (OLED/encoder/RTC)
+- Check capture devices: `arecord -l`
+- For I2S mic: verify I2S/PCM is enabled and the correct overlay is loaded
+- Verify `audio.low_level.device`, `channels`, and `channel_index` in config.yaml
 
 ### Menu not responding
-- Check button connections
-- Verify GPIO pin assignments in config.yaml
-- Test buttons individually with GPIO test script
+- Verify encoder wiring (3.3V/GND/SDA/SCL)
+- Confirm the encoder appears in `i2cdetect -y 1` at 0x49
+- Verify `menu.input_type: 'i2c_encoder'` and `menu.encoder_i2c_address` in config.yaml
 
 ### Poor FFT resolution
 - Adjust FFT size in config.yaml (increase for better resolution)

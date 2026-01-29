@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""
+"""audio_input.py
+
 Audio Input Module
-Handles dual input modes: low-level (10mV-1V) and high-power (40W output)
+
+Supports two input modes:
+- low_level: Digital I2S microphone input (e.g., SPH0645) via PortAudio/ALSA (sounddevice)
+- high_power: USB audio interface line-in via PortAudio/ALSA (sounddevice)
 """
 
 import logging
 import threading
 import queue
+import time
 from typing import Optional
 
 import numpy as np
@@ -16,17 +21,6 @@ try:
 except ImportError:
     sd = None
     logging.warning("sounddevice not available, audio input disabled")
-
-try:
-    # For ADC input (low-level signals)
-    import board
-    import busio
-    import adafruit_ads1x15.ads1115 as ADS
-    from adafruit_ads1x15.analog_in import AnalogIn
-except ImportError:
-    ADS = None
-    AnalogIn = None
-    logging.warning("ADC libraries not available, low-level input disabled")
 
 
 class AudioInput:
@@ -55,38 +49,44 @@ class AudioInput:
         self.logger.info(f"Audio input initialized in {self.mode} mode")
     
     def _init_low_level_input(self):
-        """Initialize ADC for low-level signal input (10mV-1V)"""
-        self.adc = None
-        self.adc_channel = None
-        
-        if ADS is None:
-            self.logger.warning("ADC not available, low-level input disabled")
+        """Initialize I2S microphone capture settings for low-level input."""
+        self.low_level_device = None
+        self.low_level_sample_rate = None
+        self.low_level_channels = None
+        self.low_level_channel_index = 0
+        self.low_level_gain = 1.0
+        self.low_level_remove_dc = True
+        self.low_level_dtype = 'float32'
+
+        if sd is None:
+            self.logger.warning("sounddevice not available, low-level input disabled")
             return
-        
+
         try:
-            # Initialize I2C and ADC
-            i2c = busio.I2C(board.SCL, board.SDA)
-            self.adc = ADS.ADS1115(i2c)
-            
-            # Configure ADC channel with appropriate gain for 10mV-1V range
-            channel_num = self.config['low_level']['adc_channel']
-            if channel_num == 0:
-                self.adc_channel = AnalogIn(self.adc, ADS.P0)
-            elif channel_num == 1:
-                self.adc_channel = AnalogIn(self.adc, ADS.P1)
-            elif channel_num == 2:
-                self.adc_channel = AnalogIn(self.adc, ADS.P2)
-            elif channel_num == 3:
-                self.adc_channel = AnalogIn(self.adc, ADS.P3)
-            
-            # Set gain for better resolution in low voltage range
-            # Gain of 16 gives range of +/- 0.256V which is suitable for our 10mV-1V range
-            self.adc.gain = 16
-            
-            self.logger.info("ADC initialized for low-level input")
+            low_cfg = self.config.get('low_level', {})
+
+            device = low_cfg.get('device', 'default')
+            if device == 'default':
+                self.low_level_device = sd.default.device[0]  # Default input device
+            else:
+                # Allow either numeric index or a PortAudio device name/substring
+                self.low_level_device = int(device) if str(device).isdigit() else str(device)
+
+            self.low_level_sample_rate = int(low_cfg.get('sample_rate', self.sample_rate))
+            self.low_level_channels = int(low_cfg.get('channels', 1))
+            self.low_level_channel_index = int(low_cfg.get('channel_index', 0))
+            self.low_level_gain = float(low_cfg.get('gain', 1.0))
+            self.low_level_remove_dc = bool(low_cfg.get('remove_dc', True))
+            self.low_level_dtype = str(low_cfg.get('dtype', 'float32'))
+
+            self.logger.info(
+                "Low-level input initialized (I2S mic): "
+                f"device={self.low_level_device}, sr={self.low_level_sample_rate}, "
+                f"channels={self.low_level_channels}, ch_index={self.low_level_channel_index}"
+            )
         except Exception as e:
-            self.logger.error(f"Failed to initialize ADC: {e}")
-            self.adc = None
+            self.logger.error(f"Failed to initialize low-level (I2S) input: {e}")
+            self.low_level_device = None
     
     def _init_high_power_input(self):
         """Initialize audio device for high-power signal input (40W output)"""
@@ -135,39 +135,57 @@ class AudioInput:
             self._high_power_input_loop()
     
     def _low_level_input_loop(self):
-        """Capture loop for low-level signals using ADC"""
-        if self.adc is None or self.adc_channel is None:
-            self.logger.error("ADC not initialized for low-level input")
+        """Capture loop for low-level input using an I2S digital microphone."""
+        if sd is None or self.low_level_device is None:
+            self.logger.error("Low-level input device not initialized")
             return
-        
-        gain = self.config['low_level']['gain']
-        buffer = []
-        
+
+        low_cfg = self.config.get('low_level', {})
+        sr = int(self.low_level_sample_rate or low_cfg.get('sample_rate', self.sample_rate))
+        channels = int(self.low_level_channels or low_cfg.get('channels', 1))
+        channel_index = int(low_cfg.get('channel_index', self.low_level_channel_index))
+        gain = float(low_cfg.get('gain', self.low_level_gain))
+        remove_dc = bool(low_cfg.get('remove_dc', self.low_level_remove_dc))
+        dtype = str(low_cfg.get('dtype', self.low_level_dtype))
+
+        def audio_callback(indata, frames, time_info, status):
+            if status:
+                self.logger.warning(f"Low-level audio callback status: {status}")
+
+            if indata is None:
+                return
+
+            if getattr(indata, 'ndim', 1) == 1:
+                data = indata
+            else:
+                idx = max(0, min(channel_index, indata.shape[1] - 1))
+                data = indata[:, idx]
+
+            audio_data = np.asarray(data, dtype=np.float32)
+            if remove_dc:
+                audio_data = audio_data - float(np.mean(audio_data))
+            if gain != 1.0:
+                audio_data = audio_data * gain
+            audio_data = np.clip(audio_data, -1.0, 1.0)
+
+            try:
+                self.audio_queue.put_nowait(audio_data.copy())
+            except queue.Full:
+                pass
+
         try:
-            while self.running:
-                # Read voltage from ADC
-                voltage = self.adc_channel.voltage
-                
-                # Apply gain and convert to normalized audio sample (-1.0 to 1.0)
-                sample = (voltage * gain) / 3.3  # Normalize to -1 to 1 range
-                sample = np.clip(sample, -1.0, 1.0)
-                
-                buffer.append(sample)
-                
-                # When buffer is full, send to queue
-                if len(buffer) >= self.buffer_size:
-                    audio_data = np.array(buffer, dtype=np.float32)
-                    
-                    # Try to put in queue, discard if full
-                    try:
-                        self.audio_queue.put_nowait(audio_data)
-                    except queue.Full:
-                        pass  # Drop frame if queue is full
-                    
-                    buffer = []
-        
+            with sd.InputStream(
+                device=self.low_level_device,
+                channels=channels,
+                samplerate=sr,
+                blocksize=self.buffer_size,
+                dtype=dtype,
+                callback=audio_callback,
+            ):
+                while self.running:
+                    sd.sleep(100)
         except Exception as e:
-            self.logger.error(f"Error in low-level input loop: {e}")
+            self.logger.error(f"Error in low-level (I2S) input loop: {e}")
     
     def _high_power_input_loop(self):
         """Capture loop for high-power signals using audio device"""
